@@ -1,0 +1,6 @@
+snake
+snake.exe
+*.o
+*.obj
+*.dll
+best_score.dat
