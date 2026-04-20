@@ -39,6 +39,7 @@
     }
 
     .app {
+      position: relative;
       width: min(920px, 100%);
       background: linear-gradient(180deg, rgba(19, 33, 57, 0.95), rgba(10, 20, 36, 0.95));
       border: 1px solid var(--line-soft);
@@ -106,6 +107,34 @@
       margin: 0 0 12px;
       color: var(--muted);
       font-size: 14px;
+    }
+
+    .briefing {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 0 0 12px;
+    }
+
+    .briefing-item {
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(67, 217, 196, 0.08);
+    }
+
+    .briefing-item strong {
+      display: block;
+      font-size: 12px;
+      color: #d7fbf4;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .briefing-item span {
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .hidden { display: none; }
@@ -185,6 +214,50 @@
 
     .danger { color: var(--danger); }
 
+    .intro-overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      background: radial-gradient(circle at center, rgba(46, 143, 217, 0.28), rgba(7, 15, 28, 0.95));
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 20;
+    }
+
+    .intro-overlay.show {
+      display: flex;
+      animation: fadeIn 180ms ease-out;
+    }
+
+    .intro-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .intro-count {
+      font-family: "Chakra Petch", "Segoe UI", Tahoma, sans-serif;
+      font-size: clamp(58px, 13vw, 110px);
+      font-weight: 700;
+      color: #f4fbff;
+      text-shadow: 0 0 24px rgba(67, 217, 196, 0.45);
+      transform: scale(0.9);
+      transition: transform 180ms ease;
+    }
+
+    .intro-count.pop {
+      transform: scale(1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
     @keyframes enter {
       from {
         opacity: 0;
@@ -205,6 +278,7 @@
     @media (max-width: 520px) {
       body { padding: 12px; }
       .app { padding: 14px; border-radius: 16px; }
+      .briefing { grid-template-columns: 1fr; }
       .status { grid-template-columns: 1fr; }
     }
   </style>
@@ -223,6 +297,20 @@
     <section id="startCard" class="card start-panel">
       <h2>Commencer une partie</h2>
       <p class="start-copy">Choisis ton theme, puis lance le challenge.</p>
+      <div class="briefing">
+        <div class="briefing-item">
+          <strong>Format</strong>
+          <span>8 questions, 1 theme</span>
+        </div>
+        <div class="briefing-item">
+          <strong>Objectif</strong>
+          <span>Repondre vite et juste</span>
+        </div>
+        <div class="briefing-item">
+          <strong>Classement</strong>
+          <span>Ton meilleur score est sauvegarde</span>
+        </div>
+      </div>
       <label for="domainSelect">Sur quoi tu veux ce QCM ?</label>
       <select id="domainSelect">
         <option value="voiture">Voiture</option>
@@ -251,6 +339,11 @@
       <div id="resultText" class="result"></div>
       <button id="restartBtn" class="hidden">Nouvelle partie</button>
     </section>
+
+    <div id="introOverlay" class="intro-overlay" aria-hidden="true">
+      <div class="intro-label">Preparation de la partie</div>
+      <div id="introCount" class="intro-count">3</div>
+    </div>
   </main>
 
   <script>
@@ -414,6 +507,8 @@
     const answers = document.getElementById("answers");
     const resultText = document.getElementById("resultText");
     const restartBtn = document.getElementById("restartBtn");
+    const introOverlay = document.getElementById("introOverlay");
+    const introCount = document.getElementById("introCount");
 
     let bestScore = Number(localStorage.getItem(BEST_KEY) || 0);
     let score = 0;
@@ -421,6 +516,24 @@
     let timer = null;
     let currentSet = [];
     let currentIndex = 0;
+    let isLaunching = false;
+
+    function wait(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function runProIntro() {
+      const sequence = ["3", "2", "1", "GO"];
+      introOverlay.classList.add("show");
+      for (const step of sequence) {
+        introCount.textContent = step;
+        introCount.classList.remove("pop");
+        void introCount.offsetWidth;
+        introCount.classList.add("pop");
+        await wait(step === "GO" ? 450 : 520);
+      }
+      introOverlay.classList.remove("show");
+    }
 
     function shuffle(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
@@ -476,7 +589,10 @@
       });
     }
 
-    function startGame() {
+    async function startGame() {
+      if (isLaunching) return;
+      isLaunching = true;
+
       const key = domainSelect.value;
       const bank = questionSets[key] || questionSets.ecole;
       currentSet = shuffle([...bank]);
@@ -489,6 +605,10 @@
       startCard.classList.add("hidden");
       gameCard.classList.remove("hidden");
 
+  questionText.textContent = "Preparation...";
+  answers.innerHTML = "";
+  await runProIntro();
+
       updateStatus();
       showQuestion();
 
@@ -500,6 +620,8 @@
           endGame("Temps termine");
         }
       }, 1000);
+
+      isLaunching = false;
     }
 
     readyBtn.onclick = startGame;
